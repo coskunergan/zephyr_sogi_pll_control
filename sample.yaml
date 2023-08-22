@@ -1,10 +1,25 @@
+sample:
+  name: DS18B20 Sogi PLL Control
+common:
+  harness: console
+  tags: sensors
 tests:
-  zpp.sample.kernel.cond_var:
-    arch_exclude: posix
-    platform_exclude: qemu_x86_coverage
-    tags: zpp kernel condition_variables
-    harness: console
+  sample.sensor.ds18b20.w1_serial:
+    platform_allow:
+      - stm32l1_disco
+      - stm32f4_disco
+    integration_platforms:
+      - stm32l1_disco
+      - stm32f4_disco
     harness_config:
       type: one_line
       regex:
-        - ".*Waited and joined with 3 threads"
+        - "Temp: (.*)"
+      fixture: fixture_w1_serial_ds18b20
+    platform_allow: stm32l1_disco
+    integration_platforms:
+      - stm32l1_disco
+    harness_config:
+      type: one_line
+      regex:
+        - "Temp: (.*)"

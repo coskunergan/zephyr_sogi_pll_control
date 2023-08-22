@@ -6,10 +6,10 @@
     Author: Coskun ERGAN
 */
 
-#include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/sensor.h>
 #include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/sensor.h>
 
 #include <zpp.hpp>
 #include <chrono>
@@ -39,31 +39,42 @@ namespace
     thread t[NUM_THREADS];
 }
 
+static const struct device *get_ds18b20_device(void)
+{
+    const struct device *const dev = DEVICE_DT_GET_ANY(maxim_ds18b20);
+
+    if(dev == NULL)
+    {
+        /* No such node, or the node does not have status "okay". */
+        printf("\nError: no device found.\n");
+        return NULL;
+    }
+
+    if(!device_is_ready(dev))
+    {
+        printf("\nError: Device \"%s\" is not ready; "
+               "check the driver initialization logs for errors.\n",
+               dev->name);
+        return NULL;
+    }
+
+    printf("Found device \"%s\", getting sensor data\n", dev->name);
+    return dev;
+}
+
 void sensor_task(int my_id) noexcept
 {
-    struct sensor_value temperature;
-    struct sensor_value humidity;
-    const struct device *const dht22 = DEVICE_DT_GET_ONE(aosong_dht);
-    if(!device_is_ready(dht22))
+    struct sensor_value temp;
+    const struct device *dev = get_ds18b20_device();
+    if(dev == NULL)
     {
-        printf("\rDevice %s is not ready", dht22->name);
         return;
     }
     for(;;)
     {
-        int rc = sensor_sample_fetch(dht22);
-        if(rc == 0)
-        {
-            rc = sensor_channel_get(dht22, SENSOR_CHAN_AMBIENT_TEMP,
-                                    &temperature);
-            if(rc == 0)
-            {
-                rc = sensor_channel_get(dht22, SENSOR_CHAN_HUMIDITY,
-                                        &humidity);
-            }
-            printf_io.turn_off_bl_enable();
-            printf("\rTemp: %.1f RH: %.1f %%RH  ", sensor_value_to_double(&temperature), sensor_value_to_double(&humidity));
-        }
+        sensor_sample_fetch(dev);
+        sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
+        printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
         this_thread::sleep_for(1000ms);
     }
 }

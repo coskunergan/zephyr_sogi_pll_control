@@ -1,11 +1,19 @@
 
-/ {
-	dht22 {
-		compatible = "aosong,dht";
-		status = "okay";
-		dio-gpios = <&gpioc 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-		dht22;
-	};				
+#include "serial_overlay.dtsi"
+
+&usart3 {
+	pinctrl-0 = <&usart3_tx_pc10 &usart3_rx_pc11>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&usart3_tx_pc10 {
+	drive-open-drain;
+	bias-pull-up;
+};
+
+/ {	
 	lcd_bl: lcd_bl {			
 		compatible = "lcd-pins";
 		gpios = <&gpiob 0 GPIO_ACTIVE_LOW>;	
