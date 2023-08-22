@@ -1,0 +1,47 @@
+
+/ {
+	dht22 {
+		compatible = "aosong,dht";
+		status = "okay";
+		dio-gpios = <&gpioc 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		dht22;
+	};				
+	lcd_bl: lcd_bl {			
+		compatible = "lcd-pins";
+		gpios = <&gpiob 0 GPIO_ACTIVE_LOW>;	
+	};
+	lcd_enb: lcd_enb {			
+		compatible = "lcd-pins";
+		gpios = <&gpiob 13 GPIO_ACTIVE_LOW>;
+	};
+	lcd_rst: lcd_rst {			
+		compatible = "lcd-pins";
+		gpios = <&gpioc 5 GPIO_ACTIVE_LOW>;
+	};		
+	lcd_cmd: lcd_cmd {			
+		compatible = "lcd-pins";
+		gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>;
+	};		
+	lcd_dta: lcd_dta {			
+		compatible = "lcd-pins";
+		gpios = <&gpiob 14 GPIO_ACTIVE_HIGH>;
+	};		
+	lcd_clk: lcd_clk {			
+		compatible = "lcd-pins";
+		gpios = <&gpiob 2 GPIO_ACTIVE_HIGH>;
+	};			
+	buzzer: buzzer {
+		compatible = "buzzer";
+		gpios = <&gpioa 11 GPIO_ACTIVE_LOW>;
+	};
+	encoder_pins: encoder_pins {
+		compatible = "encoder";
+		gpios = <&gpioa 2 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>,
+				<&gpiob 4 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+	};
+	buttons: buttons {
+		compatible = "buttons";
+		gpios = <&gpioa 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>,
+				<&gpioc 13 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+	};		
+};

@@ -1,0 +1,11 @@
+
+description: GPIO pin to buzzer
+
+compatible: "buzzer"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: |
+      The GPIO connected to the buzzer pin

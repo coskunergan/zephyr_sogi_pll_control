@@ -1,0 +1,11 @@
+
+description: GPIO input pin to buttons
+
+compatible: "buttons"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: |
+      The GPIO connected to the button pins

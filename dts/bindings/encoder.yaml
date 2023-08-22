@@ -1,0 +1,11 @@
+
+description: GPIO input pin to encoder
+
+compatible: "encoder"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: |
+      The GPIO connected to the encoder pin
