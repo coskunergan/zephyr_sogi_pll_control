@@ -9,11 +9,11 @@
       "executable": "${workspaceRoot}/build/zephyr/zephyr.elf",
       "serverpath": "C:/Program Files (x86)/SEGGER/JLink_V620c/JLinkGDBServerCL.exe",
       "servertype": "jlink",
-      "device": "STM32F407VG",
+      "device": "STM32L151RD",
       "interface": "swd",
       "serialNumber": "",
       "runToMain": true,
-      "svdFile": "${workspaceRoot}/.vscode/armcm4.svd"
+      "svdFile": "${workspaceRoot}/.vscode/armcm3.svd"
     },
     {
       "name": "J-Link attach",
@@ -23,9 +23,9 @@
       "type": "cortex-debug",
       "serverpath": "C:/Program Files (x86)/SEGGER/JLink_V620c/JLinkGDBServerCL.exe",
       "servertype": "jlink",
-      "device": "STM32F407VG",
+      "device": "STM32L151RD",
       "interface": "swd",
-      "svdFile": "${workspaceRoot}/.vscode/armcm4.svd"
+      "svdFile": "${workspaceRoot}/.vscode/armcm3.svd"
     }
   ]
 }
