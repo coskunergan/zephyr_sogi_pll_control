@@ -90,7 +90,7 @@ void sensor_task(int my_id) noexcept
     if(dev == NULL)
     {
         return;
-    } 
+    }
     for(;;)
     {
         sensor_sample_fetch(dev);
@@ -130,6 +130,10 @@ void adc_task(int my_id) noexcept
     //         return;
     //     }
     // }
+    my_adc.readAsync(1000000, []
+    {
+        buzzer.beep(10ms);
+    });
     for(;;)
     {
         int32_t val_mv;
@@ -144,9 +148,11 @@ void adc_task(int my_id) noexcept
         //     continue;
         // }
 
-        my_adc.readAsync(100000);
 
-        this_thread::sleep_for(500ms);
+
+        this_thread::sleep_for(1000ms);
+        buzzer.beep(10ms);
+        this_thread::sleep_for(1000ms);
 
         /*
          * If using differential mode, the 16 bit value
@@ -164,8 +170,6 @@ void adc_task(int my_id) noexcept
         //printk("%"PRId32, val_mv);
         //adc_raw_to_millivolts_dt(&adc_channels[0], &val_mv);
         //printf(" = %"PRId32" mV\n", val_mv);
-
-        this_thread::sleep_for(500ms);
     }
 }
 

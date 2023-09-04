@@ -13,6 +13,7 @@
 #include <zephyr/kernel.h>
 #include <cassert>
 #include <zephyr/irq.h>
+#include <functional>
 
 #include <zpp.hpp>
 #include <zpp/timer.hpp>
@@ -31,22 +32,26 @@ namespace device_adc
     class ADC
     {
     private:
+
         const struct device *_dev;
         uint8_t _channel;
+        
 
         struct adc_channel_cfg _config;
         uint8_t _resolution;
+        struct adc_sequence_options _options;
+        struct adc_sequence _sequence;
 
         struct IsrContext
         {
             struct k_work work;
             ADC *self;
-            struct adc_sequence_options options;
-            struct adc_sequence sequence;
             int16_t buffer;
-
             int16_t sample;
+            std::function<void()> done_cb;
         } _isrContext;
+
+
 
     public:
         ADC(const struct device *dev, const struct adc_channel_cfg &config, uint8_t resolution)
@@ -55,7 +60,7 @@ namespace device_adc
             , _resolution(resolution)
         {
             int result = 0;
-            assert(dev != nullptr);            
+            assert(dev != nullptr);
 
             // Configure ADC channel
             result = adc_channel_setup(_dev, &_config);
@@ -70,25 +75,26 @@ namespace device_adc
          * Starts the capture of a continuous sequence of samples.
          * @param interval_us Interval in microseconds between each consecutive sample.
          */
-        virtual void readAsync(uint32_t interval_us = 0) /*override*/
+        virtual void readAsync(uint32_t interval_us = 0, std::function<void()> &&handler = nullptr) /*override*/
         {
-            _isrContext.options =
+            _options =
             {
                 .interval_us = interval_us,
                 .callback = _hard_isr,
+                .user_data = &_isrContext,
             };
 
-            _isrContext.sequence =
+            _sequence =
             {
-                .options = &_isrContext.options,
+                .options = &_options,
                 .channels = BIT(_config.channel_id),
                 .buffer = &_isrContext.buffer,
                 .buffer_size = sizeof(_isrContext.buffer),
                 .resolution = _resolution,
             };
-
-            int res = adc_read(_dev, (adc_sequence*)&_isrContext);
-            //assert(res == 0);
+            _isrContext.done_cb = std::move(handler);
+            int res = adc_read_async(_dev, (adc_sequence *)&_sequence, nullptr);
+            assert(res == 0);
         }
 
         /**
@@ -103,23 +109,23 @@ namespace device_adc
     private:
         static void _soft_isr(struct k_work *work)
         {
-            (void)work;
-            
+             IsrContext *context = CONTAINER_OF(work, IsrContext, work);
+            if(context->done_cb)
+            {
+                context->done_cb();
+            }
         }
 
         static enum adc_action _hard_isr(const struct device *,
                                          const struct adc_sequence *sequence,
                                          uint16_t sampling_index __unused)
         {
-            IsrContext *context = CONTAINER_OF(sequence, IsrContext, sequence);
+            IsrContext * context = static_cast<IsrContext *>(sequence->options->user_data);
 
-            // // Store a copy of the conversion buffer
             context->sample = context->buffer;
 
-            // // Forward IRQ to kernel worker thread.
             k_work_submit(&context->work);
 
-            // Continue sampling
             return ADC_ACTION_REPEAT;
         }
     };
