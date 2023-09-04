@@ -23,35 +23,27 @@
 
 namespace device_adc
 {
-
 #if defined(ADC)
 #undef ADC
 #endif
-
-
     class ADC
     {
     private:
-
         const struct device *_dev;
         uint8_t _channel;
-        
-
-        struct adc_channel_cfg _config;
         uint8_t _resolution;
+        struct adc_channel_cfg _config;
         struct adc_sequence_options _options;
         struct adc_sequence _sequence;
-
         struct IsrContext
         {
             struct k_work work;
             ADC *self;
             int16_t buffer;
             int16_t sample;
-            std::function<void()> done_cb;
+            std::function<void(int16_t)> done_cb;
+            enum adc_action state;
         } _isrContext;
-
-
 
     public:
         ADC(const struct device *dev, const struct adc_channel_cfg &config, uint8_t resolution)
@@ -62,20 +54,14 @@ namespace device_adc
             int result = 0;
             assert(dev != nullptr);
 
-            // Configure ADC channel
             result = adc_channel_setup(_dev, &_config);
             assert(result == 0);
 
-            // Configure soft IRQ
             k_work_init(&_isrContext.work, _soft_isr);
             _isrContext.self = this;
         }
 
-        /**
-         * Starts the capture of a continuous sequence of samples.
-         * @param interval_us Interval in microseconds between each consecutive sample.
-         */
-        virtual void readAsync(uint32_t interval_us = 0, std::function<void()> &&handler = nullptr) /*override*/
+        virtual void readAsync(uint32_t interval_us, std::function<void(int16_t)> &&handler) /*override*/
         {
             _options =
             {
@@ -83,7 +69,6 @@ namespace device_adc
                 .callback = _hard_isr,
                 .user_data = &_isrContext,
             };
-
             _sequence =
             {
                 .options = &_options,
@@ -93,26 +78,24 @@ namespace device_adc
                 .resolution = _resolution,
             };
             _isrContext.done_cb = std::move(handler);
-            int res = adc_read_async(_dev, (adc_sequence *)&_sequence, nullptr);
+            _isrContext.state = ADC_ACTION_REPEAT;
+            int res = adc_read_async(_dev, &_sequence, nullptr);
             assert(res == 0);
         }
 
-        /**
-         * Cancel async read and stops the capture, does nothing in case there is
-         * no capture in progress.
-         */
         virtual void cancelRead() /*override*/
         {
-            // TODO: To be implemented
+            _isrContext.done_cb = nullptr;
+            _isrContext.state = ADC_ACTION_FINISH;
         }
 
     private:
         static void _soft_isr(struct k_work *work)
         {
-             IsrContext *context = CONTAINER_OF(work, IsrContext, work);
+            IsrContext *context = CONTAINER_OF(work, IsrContext, work);
             if(context->done_cb)
             {
-                context->done_cb();
+                context->done_cb(context->sample);
             }
         }
 
@@ -120,14 +103,10 @@ namespace device_adc
                                          const struct adc_sequence *sequence,
                                          uint16_t sampling_index __unused)
         {
-            IsrContext * context = static_cast<IsrContext *>(sequence->options->user_data);
-
+            IsrContext *context = static_cast<IsrContext *>(sequence->options->user_data);
             context->sample = context->buffer;
-
-            k_work_submit(&context->work);
-
-            return ADC_ACTION_REPEAT;
+            k_work_submit(&context->work);            
+            return context->state;
         }
     };
-
 }

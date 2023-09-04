@@ -130,9 +130,9 @@ void adc_task(int my_id) noexcept
     //         return;
     //     }
     // }
-    my_adc.readAsync(1000000, []
+    my_adc.readAsync(1000000, [](int16_t val)
     {
-        buzzer.beep(10ms);
+        printf("\rADC: %d   ", val);
     });
     for(;;)
     {
@@ -150,9 +150,8 @@ void adc_task(int my_id) noexcept
 
 
 
-        this_thread::sleep_for(1000ms);
-        buzzer.beep(10ms);
-        this_thread::sleep_for(1000ms);
+        this_thread::sleep_for(5000ms);
+        buzzer.beep(3ms);
 
         /*
          * If using differential mode, the 16 bit value
