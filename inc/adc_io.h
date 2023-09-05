@@ -23,16 +23,24 @@
 
 namespace device_adc
 {
+    using namespace zpp;
+    using namespace std::chrono;
 #if defined(ADC)
 #undef ADC
 #endif
+
+#if !DT_NODE_EXISTS(DT_PATH(zephyr_user)) || \
+	!DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channels)
+#error "No suitable devicetree overlay specified"
+#endif
+
+#define DT_SPEC_AND_COMMA(node_id, prop, idx) \
+ 	ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
+
     class ADC
     {
     private:
-        const struct device *_dev;
-        uint8_t _channel;
-        uint8_t _resolution;
-        struct adc_channel_cfg _config;
+        const struct adc_dt_spec _spec_dt;
         struct adc_sequence_options _options;
         struct adc_sequence _sequence;
         struct IsrContext
@@ -46,47 +54,59 @@ namespace device_adc
         } _isrContext;
 
     public:
-        ADC(const struct device *dev, const struct adc_channel_cfg &config, uint8_t resolution)
-            : _dev(dev)
-            , _config(config)
-            , _resolution(resolution)
+        ADC(const struct adc_dt_spec &spec_dt)
+            : _spec_dt(spec_dt)
         {
             int result = 0;
-            assert(dev != nullptr);
 
-            result = adc_channel_setup(_dev, &_config);
+            result = adc_channel_setup_dt(&_spec_dt);
             assert(result == 0);
 
             k_work_init(&_isrContext.work, _soft_isr);
             _isrContext.self = this;
         }
 
-        virtual void readAsync(uint32_t interval_us, std::function<void(int16_t)> &&handler) /*override*/
+        virtual void readAsync(microseconds us, std::function<void(int16_t)> &&handler)
         {
             _options =
             {
-                .interval_us = interval_us,
+                .interval_us = us.count(),
                 .callback = _hard_isr,
                 .user_data = &_isrContext,
             };
             _sequence =
             {
                 .options = &_options,
-                .channels = BIT(_config.channel_id),
+                .channels = BIT(_spec_dt.channel_cfg.channel_id),
                 .buffer = &_isrContext.buffer,
                 .buffer_size = sizeof(_isrContext.buffer),
-                .resolution = _resolution,
+                .resolution = _spec_dt.resolution,
             };
             _isrContext.done_cb = std::move(handler);
             _isrContext.state = ADC_ACTION_REPEAT;
-            int res = adc_read_async(_dev, &_sequence, nullptr);
+            int res = adc_read_async(_spec_dt.dev, &_sequence, nullptr);
             assert(res == 0);
         }
 
-        virtual void cancelRead() /*override*/
+        virtual void cancelRead()
         {
             _isrContext.done_cb = nullptr;
             _isrContext.state = ADC_ACTION_FINISH;
+        }
+
+        virtual int32_t get_voltage()
+        {
+            int32_t val_mv;
+            if(_spec_dt.channel_cfg.differential)
+            {
+                val_mv = (int32_t)((int16_t)_isrContext.sample);
+            }
+            else
+            {
+                val_mv = (int32_t)_isrContext.sample;
+            }
+            adc_raw_to_millivolts_dt(&_spec_dt, &val_mv);
+            return val_mv;
         }
 
     private:
@@ -105,8 +125,13 @@ namespace device_adc
         {
             IsrContext *context = static_cast<IsrContext *>(sequence->options->user_data);
             context->sample = context->buffer;
-            k_work_submit(&context->work);            
+            k_work_submit(&context->work);
             return context->state;
         }
+    };
+
+    ADC adc[]
+    {
+        DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, (adc_dt_spec)DT_SPEC_AND_COMMA)
     };
 }

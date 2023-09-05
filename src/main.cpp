@@ -33,23 +33,10 @@ using namespace device_buzzer;
 using namespace device_encoder;
 using namespace device_adc;
 
-#if !DT_NODE_EXISTS(DT_PATH(zephyr_user)) || \
-	!DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channels)
-#error "No suitable devicetree overlay specified"
-#endif
-
-#define DT_SPEC_AND_COMMA(node_id, prop, idx) \
- 	ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
-
-/* Data of ADC io-channels specified in devicetree. */
-static const struct adc_dt_spec adc_channels[] =
-{
-    DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, DT_SPEC_AND_COMMA)
-};
-
 #define NUM_THREADS 4
 
-ADC my_adc(adc_channels[0].dev, adc_channels[0].channel_cfg, 12);
+ADC &test_adc = adc[0];
+
 mutex enc_mutex;
 mutex btn_mutex;
 
@@ -100,75 +87,19 @@ void sensor_task(int my_id) noexcept
     }
 }
 
-
 void adc_task(int my_id) noexcept
 {
-    int err;
-    uint32_t count = 0;
-    uint16_t buf;
-    struct adc_sequence sequence =
-    {
-        .buffer = &buf,
-        /* buffer size in bytes, not number of samples */
-        .buffer_size = sizeof(buf),
-    };
-
-    /* Configure channels individually prior to sampling. */
-    // for(size_t i = 0U; i < ARRAY_SIZE(adc_channels); i++)
-    // {
-    //     if(!adc_is_ready_dt(&adc_channels[i]))
-    //     {
-    //         printk("ADC controller device %s not ready\n", adc_channels[i].dev->name);
-    //         return;
-    //     }
-
-    //     err = adc_channel_setup_dt(&adc_channels[i]);
-    //     //err = adc_channel_setup(adc_channels[i].dev, &adc_channels[i].channel_cfg);
-    //     if(err < 0)
-    //     {
-    //         printk("Could not setup channel #%d (%d)\n", i, err);
-    //         return;
-    //     }
-    // }
-    my_adc.readAsync(1000000, [](int16_t val)
+    test_adc.readAsync(1000ms, [](int16_t val)
     {
         printf("\rADC: %d   ", val);
+        buzzer.beep(10ms);
     });
+
     for(;;)
     {
-        int32_t val_mv;
-        printf("\r");
-
-        // (void)adc_sequence_init_dt(&adc_channels[0], &sequence);
-
-        // err = adc_read(adc_channels[0].dev, &sequence);
-        // if(err < 0)
-        // {
-        //     printk("Could not read (%d)\n", err);
-        //     continue;
-        // }
-
-
-
         this_thread::sleep_for(5000ms);
         buzzer.beep(3ms);
-
-        /*
-         * If using differential mode, the 16 bit value
-         * in the ADC sample buffer should be a signed 2's
-         * complement value.
-         */
-        // if(adc_channels[0].channel_cfg.differential)
-        // {
-        //     val_mv = (int32_t)((int16_t)buf);
-        // }
-        // else
-        // {
-        //     val_mv = (int32_t)buf;
-        // }
-        //printk("%"PRId32, val_mv);
-        //adc_raw_to_millivolts_dt(&adc_channels[0], &val_mv);
-        //printf(" = %"PRId32" mV\n", val_mv);
+        printf("\rV = %"PRId32" mV\n", test_adc.get_voltage());
     }
 }
 
@@ -204,7 +135,7 @@ int main(void)
 {
     printf_io.turn_off_bl_enable();
     printf("\rRestart..");
-    //buzzer.beep();
+    buzzer.beep();
 
     const thread_attr attrs(
         thread_prio::preempt(10),

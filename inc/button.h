@@ -22,31 +22,17 @@ namespace device_button
 {
     using namespace zpp;
     using namespace std::chrono;
-#define NUM_BUTTON_PINS DT_PROP_LEN(DT_PATH(buttons), gpios)
+
 #if !DT_NODE_EXISTS(DT_NODELABEL(buttons))
 #error "Overlay for button node not properly defined."
 #endif
     static const struct gpio_dt_spec buttons[] =
     {
-        GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(buttons), gpios, 0),
-#if NUM_BUTTON_PINS >= 2
-        GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(buttons), gpios, 1),
-#endif
-#if NUM_BUTTON_PINS >= 3
-        GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(buttons), gpios, 2),
-#endif
-#if NUM_BUTTON_PINS >= 4
-        GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(buttons), gpios, 3),
-#endif
-#if NUM_BUTTON_PINS >= 5
-        GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(buttons), gpios, 4),
-#endif
-#if NUM_BUTTON_PINS >= 6
-        GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(buttons), gpios, 5),
-#endif
+        DT_FOREACH_PROP_ELEM_SEP(DT_NODELABEL(buttons), gpios,
+                                 GPIO_DT_SPEC_GET_BY_IDX, (,))
     };
 
-    static struct gpio_callback button_cb_data[NUM_BUTTON_PINS];
+    static struct gpio_callback button_cb_data[ARRAY_SIZE(buttons)];
     static condition_variable button_cv;
     static milliseconds debounce_time;
     static size_t button_id;
@@ -59,11 +45,11 @@ namespace device_button
         timer_wrapper() noexcept : tmr(basic_timer(timer_callback)) {};
         basic_timer<void(*)(timer_base *)> tmr;
     };
-    timer_wrapper timers[NUM_BUTTON_PINS];
+    timer_wrapper timers[ARRAY_SIZE(buttons)];
 
     void timer_callback(timer_base *t) noexcept
     {
-        for(size_t i = 0; i < NUM_BUTTON_PINS; i++)
+        for(size_t i = 0; i < ARRAY_SIZE(buttons); i++)
         {
             if(&timers[i].tmr == t)
             {
@@ -74,7 +60,7 @@ namespace device_button
 
     void button_isr(const struct device *dev, struct gpio_callback *cb, uint32_t pin) noexcept
     {
-        for(size_t i = 0; i < NUM_BUTTON_PINS; i++)
+        for(size_t i = 0; i < ARRAY_SIZE(buttons); i++)
         {
             if(&button_cb_data[i] == cb)
             {
@@ -92,7 +78,7 @@ namespace device_button
         button()
         {
             set_debounce_time();
-            for(size_t i = 0; i < NUM_BUTTON_PINS; i++)
+            for(size_t i = 0; i < ARRAY_SIZE(buttons); i++)
             {
                 gpio_pin_configure_dt(&buttons[i], GPIO_INPUT);
                 gpio_pin_interrupt_configure_dt(&buttons[i], GPIO_INT_EDGE_TO_ACTIVE);
@@ -119,7 +105,7 @@ namespace device_button
         size_t get_id()
         {
             return button_id;
-        }        
+        }
 
         condition_variable &event_cv()
         {
