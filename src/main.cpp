@@ -35,7 +35,7 @@ using namespace device_adc;
 
 #define NUM_THREADS 4
 
-ADC &test_adc = adc[0];
+ADC adc;
 
 mutex enc_mutex;
 mutex btn_mutex;
@@ -89,7 +89,7 @@ void sensor_task(int my_id) noexcept
 
 void adc_task(int my_id) noexcept
 {
-    test_adc.readAsync(1000ms, [](int16_t val)
+    adc.readAsync(1000ms, [](size_t idx, int16_t val)
     {
         printf("\rADC: %d   ", val);
         buzzer.beep(10ms);
@@ -99,7 +99,7 @@ void adc_task(int my_id) noexcept
     {
         this_thread::sleep_for(5000ms);
         buzzer.beep(3ms);
-        printf("\rV = %"PRId32" mV\n", test_adc.get_voltage());
+        printf("\rV = %"PRId32" mV\n", adc.get_voltage(0));
     }
 }
 
