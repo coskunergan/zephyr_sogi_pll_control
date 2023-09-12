@@ -33,12 +33,20 @@ using namespace device_buzzer;
 using namespace device_encoder;
 using namespace device_adc;
 
-#define NUM_THREADS 4
+#define NUM_THREADS 5
 
 ADC adc;
 
+typedef enum
+{
+    ac_input = 0,
+} adc_t;
+
 mutex enc_mutex;
 mutex btn_mutex;
+
+bool set_mode_enable = false;
+float set_value = 35.0;
 
 namespace
 {
@@ -82,24 +90,31 @@ void sensor_task(int my_id) noexcept
     {
         sensor_sample_fetch(dev);
         sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
-        printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
+        //printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
         this_thread::sleep_for(3000ms);
     }
 }
 
 void adc_task(int my_id) noexcept
 {
-    adc.readAsync(1000ms, [](size_t idx, int16_t val)
+    adc.readAsync(1000ms, [&](size_t idx, int16_t val)
     {
-        printf("\rADC: %d   ", val);
-        buzzer.beep(10ms);
+        switch((adc_t)idx)
+        {
+            case ac_input:
+                //printf("\rADC: %d   ", val);
+                buzzer.beep(10ms);                
+                break;
+            default:
+                break;
+        }
     });
 
     for(;;)
     {
         this_thread::sleep_for(5000ms);
         buzzer.beep(3ms);
-        printf("\rV = %"PRId32" mV\n", adc.get_voltage(0));
+        //printf("\rV = %"PRId32" mV\n", adc.get_voltage(0));
     }
 }
 
@@ -114,7 +129,7 @@ void btn_task(int my_id) noexcept
         button.event_cv().wait(lk);
         buzzer.beep(20ms);
         printf_io.turn_off_bl_enable();
-        printf("\rButton : %d Pressed.  ", button.get_id());
+        set_mode_enable = !set_mode_enable;        
     }
 }
 
@@ -122,12 +137,34 @@ void enc_task(int my_id) noexcept
 {
     unique_lock lk(enc_mutex);
 
+    encoder.set_count(350);
+
     for(;;)
     {
         encoder.event_cv().wait(lk);
         buzzer.beep(5ms);
-        printf_io.turn_off_bl_enable();
-        printf("\rEnc : %d  ", encoder.get_count());
+        printf_io.turn_off_bl_enable();        
+    }
+}
+
+void display_task(int my_id) noexcept
+{    
+    char buffer[16];
+    for(;;)
+    {
+        this_thread::sleep_for(100ms);
+        printf("\rISI: 37.7 %%99 ");
+        if(set_mode_enable == false)
+        {            
+            encoder.set_count(set_value * 10);
+            sprintf(buffer, "\nSET: %.1f 50L ", set_value);
+        }
+        else
+        {
+            set_value = (float)encoder.get_count()  / 10;
+            sprintf(buffer, "\nSET:>%.1f<50L ", set_value);
+        }
+        printf(buffer);
     }
 }
 
@@ -147,6 +184,7 @@ int main(void)
     t[1] = thread(tcb[1], tstack(1), attrs, btn_task, 2);
     t[2] = thread(tcb[2], tstack(2), attrs, sensor_task, 3);
     t[3] = thread(tcb[3], tstack(3), attrs, adc_task, 4);
+    t[4] = thread(tcb[4], tstack(4), attrs, display_task, 5);
 
     for(int i = 0; i < NUM_THREADS; i++)
     {

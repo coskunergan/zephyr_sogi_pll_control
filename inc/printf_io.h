@@ -262,7 +262,7 @@ namespace device_printf
             {
                 if(ch_count < 14)
                 {
-                    ch_count = 14;
+                    ch_count = 13;
                     gpio_pin_set_dt(&lcd_cmd, false);
                     io_send(0xB1);
                     io_send(0x00);
@@ -287,6 +287,11 @@ namespace device_printf
                 {
                     io_send(char_table[temp][i]);
                 }
+                if(ch_count == 26)
+                {
+                    io_send(0);
+                    io_send(0);
+                }
             }
             return ch;
         }
@@ -299,7 +304,7 @@ namespace device_printf
 
     private:
         uint8_t ch_count;
-        
+
         void io_send(uint8_t byte)
         {
             for(uint8_t i = 0; i < 8; i++)
