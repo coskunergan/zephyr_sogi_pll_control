@@ -72,3 +72,9 @@
 		zephyr,resolution = <12>;
 	};
 };
+
+&eeprom {
+
+	status = "okay";   
+};
+

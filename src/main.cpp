@@ -14,6 +14,7 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/adc.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/drivers/eeprom.h>
 
 #include <zpp.hpp>
 #include <chrono>
@@ -22,6 +23,8 @@
 #include "buzzer.h"
 #include "encoder.h"
 #include "adc_io.h"
+
+#define EEPROM_SETVAL_OFFSET 0
 
 #define STACK_SIZE (1024 + CONFIG_TEST_EXTRA_STACK_SIZE)
 
@@ -55,6 +58,22 @@ namespace
     thread t[NUM_THREADS];
 }
 
+static const struct device *get_eeprom_device(void)
+{
+    const struct device *const dev = DEVICE_DT_GET(DT_ALIAS(eeprom_0));
+    //const struct device *const dev=nullptr;
+
+    // if(!device_is_ready(dev))
+    // {
+    //     printk("\nError: Device \"%s\" is not ready; "
+    //            "check the driver initialization logs for errors.\n",
+    //            dev->name);
+    //     return NULL;
+    // }
+
+    // printk("Found EEPROM device \"%s\"\n", dev->name);
+    return dev;
+}
 static const struct device *get_ds18b20_device(void)
 {
     const struct device *const dev = DEVICE_DT_GET_ANY(maxim_ds18b20);
@@ -103,7 +122,7 @@ void adc_task(int my_id) noexcept
         {
             case ac_input:
                 //printf("\rADC: %d   ", val);
-                buzzer.beep(10ms);                
+                buzzer.beep(10ms);
                 break;
             default:
                 break;
@@ -118,7 +137,7 @@ void adc_task(int my_id) noexcept
     }
 }
 
-void btn_task(int my_id) noexcept
+void btn_task(int my_id) noexcept // ok
 {
     unique_lock lk(btn_mutex);
 
@@ -129,40 +148,55 @@ void btn_task(int my_id) noexcept
         button.event_cv().wait(lk);
         buzzer.beep(20ms);
         printf_io.turn_off_bl_enable();
-        set_mode_enable = !set_mode_enable;        
+        set_mode_enable = !set_mode_enable;
     }
 }
 
-void enc_task(int my_id) noexcept
+void enc_task(int my_id) noexcept // ok
 {
     unique_lock lk(enc_mutex);
-
-    encoder.set_count(350);
 
     for(;;)
     {
         encoder.event_cv().wait(lk);
         buzzer.beep(5ms);
-        printf_io.turn_off_bl_enable();        
+        printf_io.turn_off_bl_enable();
     }
 }
 
 void display_task(int my_id) noexcept
-{    
+{
+    //const struct device *eeprom = get_eeprom_device();
     char buffer[16];
+    float temp_set_value;
+   // if(eeprom == NULL)
+    {
+        //return 0;
+    }
+    //int rc = eeprom_read(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
+    //if(rc < 0)
+    {
+       ///printk("Error: Couldn't read eeprom: err: %d.\n", rc);
+        //return 0;
+    }
     for(;;)
     {
         this_thread::sleep_for(100ms);
         printf("\rISI: 37.7 %%99 ");
-        if(set_mode_enable == false)
-        {            
-            encoder.set_count(set_value * 10);
-            sprintf(buffer, "\nSET: %.1f 50L ", set_value);
-        }
-        else
+        if(set_mode_enable)
         {
             set_value = (float)encoder.get_count()  / 10;
             sprintf(buffer, "\nSET:>%.1f<50L ", set_value);
+            if(temp_set_value != set_value)
+            {
+                //eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
+                temp_set_value = set_value;
+            }
+        }
+        else
+        {
+            encoder.set_count(set_value * 10);
+            sprintf(buffer, "\nSET: %.1f 50L ", set_value);
         }
         printf(buffer);
     }
