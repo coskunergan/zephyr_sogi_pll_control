@@ -1,5 +1,5 @@
 
-#include "serial_overlay.dtsi"
+#include "stm32l1_disco.dtsi"
 
 / {	
 	lcd_bl: lcd_bl {			
@@ -44,8 +44,7 @@
 		/* adjust channel number according to pinmux in board.dts */
 		io-channels = <&adc1 10>;
 		io-channel-names = "ADC_V";
-	};		
-
+	};	
 };
 
 &usart3 {
@@ -73,8 +72,6 @@
 	};
 };
 
-&eeprom {
-
-	status = "okay";   
+&eeprom {	
+	status = "okay";	
 };
-

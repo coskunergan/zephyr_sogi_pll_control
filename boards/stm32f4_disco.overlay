@@ -1,4 +1,6 @@
 
+#include "stm32f4_disco.dtsi"
+
 / {
 	dht22 {
 		compatible = "aosong,dht";
@@ -43,5 +45,37 @@
 		compatible = "buttons";
 		gpios = <&gpioc 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>,
 				<&gpioe 5 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
-	};		
+	};	
+	zephyr,user {
+		/* adjust channel number according to pinmux in board.dts */
+		io-channels = <&adc1 10>;
+		io-channel-names = "ADC_V";
+	};			
 };
+
+&usart3 {
+	pinctrl-0 = <&usart3_tx_pc10 &usart3_rx_pc11>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&usart3_tx_pc10 {
+	drive-open-drain;
+	bias-pull-up;
+};
+
+&adc1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+ 
+	channel@10 {
+		reg = <10>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};
+
+

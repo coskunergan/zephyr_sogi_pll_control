@@ -60,20 +60,22 @@ namespace
 
 static const struct device *get_eeprom_device(void)
 {
-    const struct device *const dev = DEVICE_DT_GET(DT_ALIAS(eeprom_0));
-    //const struct device *const dev=nullptr;
 
-    // if(!device_is_ready(dev))
-    // {
-    //     printk("\nError: Device \"%s\" is not ready; "
-    //            "check the driver initialization logs for errors.\n",
-    //            dev->name);
-    //     return NULL;
-    // }
+    const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(eeprom));
+    //const struct device *dev = DEVICE_DT_GET(DT_ALIAS(eeprom_0));
 
-    // printk("Found EEPROM device \"%s\"\n", dev->name);
+    if(!device_is_ready(dev))
+    {
+        printk("\nError: Device \"%s\" is not ready; "
+               "check the driver initialization logs for errors.\n",
+               dev->name);
+        return NULL;
+    }
+
+    printk("Found EEPROM device \"%s\"\n", dev->name);
     return dev;
 }
+
 static const struct device *get_ds18b20_device(void)
 {
     const struct device *const dev = DEVICE_DT_GET_ANY(maxim_ds18b20);
@@ -122,7 +124,7 @@ void adc_task(int my_id) noexcept
         {
             case ac_input:
                 //printf("\rADC: %d   ", val);
-                buzzer.beep(10ms);
+                //buzzer.beep(10ms);
                 break;
             default:
                 break;
@@ -166,18 +168,19 @@ void enc_task(int my_id) noexcept // ok
 
 void display_task(int my_id) noexcept
 {
-    //const struct device *eeprom = get_eeprom_device();
+    const struct device *eeprom = get_eeprom_device();
     char buffer[16];
     float temp_set_value;
-   // if(eeprom == NULL)
+
+    if(eeprom == nullptr)
     {
-        //return 0;
+        return;
     }
-    //int rc = eeprom_read(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
-    //if(rc < 0)
+    int rc = eeprom_read(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
+    if(rc < 0)
     {
-       ///printk("Error: Couldn't read eeprom: err: %d.\n", rc);
-        //return 0;
+        printk("Error: Couldn't read eeprom: err: %d.\n", rc);
+        return;
     }
     for(;;)
     {
@@ -189,7 +192,7 @@ void display_task(int my_id) noexcept
             sprintf(buffer, "\nSET:>%.1f<50L ", set_value);
             if(temp_set_value != set_value)
             {
-                //eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
+                eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
                 temp_set_value = set_value;
             }
         }
