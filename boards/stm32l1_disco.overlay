@@ -46,8 +46,9 @@
 		io-channel-names = "ADC_V";
 	};	
 	aliases {
-		eeprom-0 = &eeprom;
-	};
+		//eeprom-0 = &eeprom;
+		eeprom-0 = &i2c_eeprom;
+	};	
 };
 
 &usart3 {
@@ -77,4 +78,20 @@
 
 &eeprom {	
 	status = "okay";	
+};
+
+&i2c2 {		
+	//clock-frequency = <I2C_BITRATE_FAST>;
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	status = "okay";	
+	i2c_eeprom: eeprom@50 {
+		status = "okay";	
+		compatible = "atmel,at24"; 
+		supply-gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
+		reg = <0x50>;//0x57
+		size = <65536>;//256
+		pagesize = <128>;//8
+		address-width = <16>;//8
+		timeout = <5>;
+	};
 };

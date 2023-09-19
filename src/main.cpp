@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -51,6 +52,11 @@ mutex btn_mutex;
 bool set_mode_enable = false;
 float set_value = 35.0;
 
+const struct gpio_dt_spec supply_pin = GPIO_DT_SPEC_GET_OR(DT_NODELABEL(i2c_eeprom), supply_gpios,
+                                       {
+                                           0
+                                       });
+
 namespace
 {
     ZPP_THREAD_STACK_ARRAY_DEFINE(tstack, NUM_THREADS, STACK_SIZE);
@@ -78,7 +84,7 @@ static const struct device *get_ds18b20_device(void)
 {
     const struct device *const dev = DEVICE_DT_GET_ANY(maxim_ds18b20);
 
-    if(dev == NULL)
+    if(!dev)
     {
         /* No such node, or the node does not have status "okay". */
         printf("\nError: no device found.\n");
@@ -174,6 +180,12 @@ void display_task(int my_id) noexcept
     {
         return;
     }
+
+    if(supply_pin.port)
+    {
+        gpio_pin_configure_dt(&supply_pin, GPIO_OUTPUT_ACTIVE);
+    }
+
     int rc = eeprom_read(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
     if(rc < 0)
     {

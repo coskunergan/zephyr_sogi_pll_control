@@ -2,12 +2,6 @@
 #include "stm32f4_disco.dtsi"
 
 / {
-	dht22 {
-		compatible = "aosong,dht";
-		status = "okay";
-		dio-gpios = <&gpioc 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-		dht22;
-	};				
 	lcd_bl: lcd_bl {			
 		compatible = "lcd-pins";
 		gpios = <&gpiob 0 GPIO_ACTIVE_LOW>;	
@@ -50,7 +44,10 @@
 		/* adjust channel number according to pinmux in board.dts */
 		io-channels = <&adc1 10>;
 		io-channel-names = "ADC_V";
-	};			
+	};	
+	aliases {		
+		eeprom-0 = &i2c_eeprom;
+	};				
 };
 
 &usart3 {
@@ -77,5 +74,21 @@
 		zephyr,resolution = <12>;
 	};
 };
+
+&i2c2 {		
+	//clock-frequency = <I2C_BITRATE_FAST>;
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	status = "okay";	
+	i2c_eeprom: eeprom@50 {
+		status = "okay";	
+		compatible = "atmel,at24"; 		
+		reg = <0x50>;//0x57
+		size = <65536>;//256
+		pagesize = <128>;//8
+		address-width = <16>;//8
+		timeout = <5>;
+	};
+};
+
 
 
