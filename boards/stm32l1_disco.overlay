@@ -45,6 +45,9 @@
 		io-channels = <&adc1 10>;
 		io-channel-names = "ADC_V";
 	};	
+	aliases {
+		eeprom-0 = &eeprom;
+	};
 };
 
 &usart3 {

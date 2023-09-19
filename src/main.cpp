@@ -60,9 +60,7 @@ namespace
 
 static const struct device *get_eeprom_device(void)
 {
-
-    const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(eeprom));
-    //const struct device *dev = DEVICE_DT_GET(DT_ALIAS(eeprom_0));
+    const struct device *dev = DEVICE_DT_GET(DT_ALIAS(eeprom_0));
 
     if(!device_is_ready(dev))
     {
@@ -182,6 +180,7 @@ void display_task(int my_id) noexcept
         printk("Error: Couldn't read eeprom: err: %d.\n", rc);
         return;
     }
+    temp_set_value = set_value;
     for(;;)
     {
         this_thread::sleep_for(100ms);
@@ -190,11 +189,6 @@ void display_task(int my_id) noexcept
         {
             set_value = (float)encoder.get_count()  / 10;
             sprintf(buffer, "\nSET:>%.1f<50L ", set_value);
-            if(temp_set_value != set_value)
-            {
-                eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
-                temp_set_value = set_value;
-            }
         }
         else
         {
@@ -202,6 +196,11 @@ void display_task(int my_id) noexcept
             sprintf(buffer, "\nSET: %.1f 50L ", set_value);
         }
         printf(buffer);
+        if(temp_set_value != set_value)
+        {
+            eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
+            temp_set_value = set_value;
+        }
     }
 }
 
