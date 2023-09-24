@@ -7,6 +7,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(Project)
 
 FILE(GLOB app_sources src/main.cpp)
+#FILE(GLOB app_sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
 target_sources(app PRIVATE ${app_sources})
 
 include_directories(inc)

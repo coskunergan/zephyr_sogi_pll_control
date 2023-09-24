@@ -24,6 +24,7 @@
 #include "buzzer.h"
 #include "encoder.h"
 #include "adc_io.h"
+//#include "mc_spll.h"
 
 #define EEPROM_SETVAL_OFFSET 0
 
@@ -36,10 +37,13 @@ using namespace device_button;
 using namespace device_buzzer;
 using namespace device_encoder;
 using namespace device_adc;
+//using namespace control; 
 
 #define NUM_THREADS 5
 
 ADC adc;
+
+//SPLL Phase;
 
 typedef enum
 {
@@ -122,6 +126,7 @@ void sensor_task(int my_id) noexcept
 
 void adc_task(int my_id) noexcept
 {
+    //Phase.reset();
     adc.readAsync(1000ms, [&](size_t idx, int16_t val)
     {
         switch((adc_t)idx)
