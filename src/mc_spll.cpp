@@ -8,9 +8,9 @@
 
 #include "mc_spll.h"
 
-// extern "C" {
-//     #include "arm_math.h"
-// }
+extern "C" {
+     #include "arm_math.h"
+}
 
 using namespace control;
 

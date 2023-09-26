@@ -24,7 +24,7 @@
 #include "buzzer.h"
 #include "encoder.h"
 #include "adc_io.h"
-//#include "mc_spll.h"
+#include "mc_spll.h"
 
 #define EEPROM_SETVAL_OFFSET 0
 
@@ -37,13 +37,17 @@ using namespace device_button;
 using namespace device_buzzer;
 using namespace device_encoder;
 using namespace device_adc;
-//using namespace control; 
+using namespace control;
 
 #define NUM_THREADS 5
 
+#define SET_DEGREE 150
+#define DIFF_DEGREE 10
+#define OFFSET_PHASE 90
+
 ADC adc;
 
-//SPLL Phase;
+SPLL Phase;
 
 typedef enum
 {
@@ -54,7 +58,7 @@ mutex enc_mutex;
 mutex btn_mutex;
 
 bool set_mode_enable = false;
-float set_value = 35.0;
+float set_value;
 
 const struct gpio_dt_spec supply_pin = GPIO_DT_SPEC_GET_OR(DT_NODELABEL(i2c_eeprom), supply_gpios,
                                        {
@@ -126,14 +130,30 @@ void sensor_task(int my_id) noexcept
 
 void adc_task(int my_id) noexcept
 {
-    //Phase.reset();
-    adc.readAsync(1000ms, [&](size_t idx, int16_t val)
+    int degree;
+    Phase.reset();
+    adc.readAsync(1ms, [&](size_t idx, int16_t val)
     {
         switch((adc_t)idx)
         {
             case ac_input:
                 //printf("\rADC: %d   ", val);
                 //buzzer.beep(10ms);
+                //GPIO_SetBits(GPIOB, GPIO_Pin_3);
+                Phase.transfer_1phase((float)val); // ~145 uSn
+                degree = ((Phase.phase() / 3.14159265358979323f) * 180.0f);
+                degree += OFFSET_PHASE;
+                degree %= 360;
+                if((degree > SET_DEGREE && degree < (DIFF_DEGREE + SET_DEGREE)) ||
+                        (degree > (SET_DEGREE + 180) && degree < (DIFF_DEGREE + SET_DEGREE + 180)))
+                {
+                    //GPIO_SetBits(GPIOC, GPIO_Pin_7);
+                }
+                else
+                {
+                    //GPIO_ResetBits(GPIOC, GPIO_Pin_7);
+                }
+                //GPIO_ResetBits(GPIOB, GPIO_Pin_3);
                 break;
             default:
                 break;
@@ -143,7 +163,7 @@ void adc_task(int my_id) noexcept
     for(;;)
     {
         this_thread::sleep_for(5000ms);
-        buzzer.beep(3ms);
+        //buzzer.beep(3ms);
         //printf("\rV = %"PRId32" mV\n", adc.get_voltage(0));
     }
 }
@@ -198,19 +218,27 @@ void display_task(int my_id) noexcept
         return;
     }
     temp_set_value = set_value;
+    float freq_sum = 0;
+    int freq = 0;
     for(;;)
     {
         this_thread::sleep_for(100ms);
-        printf("\rISI: 37.7 %%99 ");
+        freq_sum -= freq_sum / 10;
+        freq_sum += Phase.freq() * Phase.freq();
+        freq = (freq == 0) ? 1 : freq;
+        freq = (freq + ((freq_sum / 10) / freq)) / 2;
+        printf("\rISI: 37.7 %%99");
         if(set_mode_enable)
         {
             set_value = (float)encoder.get_count()  / 10;
-            sprintf(buffer, "\nSET:>%.1f<50L ", set_value);
+            set_value = (set_value < 18.0) ? 18.0 : set_value;
+            set_value = (set_value > 45.0) ? 45.0 : set_value;
+            sprintf(buffer, "\nSET:>%.1f<%c%02d ", set_value, (Phase.is_lock()) ? 'L' : 'x', freq);
         }
         else
         {
             encoder.set_count(set_value * 10);
-            sprintf(buffer, "\nSET: %.1f 50L ", set_value);
+            sprintf(buffer, "\nSET: %.1f %c%02d ", set_value, (Phase.is_lock()) ? 'L' : 'x', freq);
         }
         printf(buffer);
         if(temp_set_value != set_value)
@@ -221,11 +249,15 @@ void display_task(int my_id) noexcept
     }
 }
 
+// sprintf(row, "T:%.2f%cC",
+//         sensor_value_to_double(&temp),
+//         223 /* degree symbol */);
+
 int main(void)
 {
     printf_io.turn_off_bl_enable();
     printf("\rRestart..");
-    buzzer.beep();
+    //buzzer.beep();
 
     const thread_attr attrs(
         thread_prio::preempt(10),
