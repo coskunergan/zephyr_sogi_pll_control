@@ -15,7 +15,7 @@ namespace control
 {
     using value_t = float;
 
-    constexpr value_t T = 1 / 3200.0f;
+    constexpr value_t T = 1 / 2000.0f; // 2KHz
 
     template<typename T>
 	

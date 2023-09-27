@@ -44,10 +44,18 @@
 		/* adjust channel number according to pinmux in board.dts */
 		io-channels = <&adc1 10>;
 		io-channel-names = "ADC_V";
+
+		dac = <&dac1>;
+		dac-channel-id = <2>;
+		dac-resolution = <12>;		
 	};	
 	aliases {
 		//eeprom-0 = &eeprom;
 		eeprom-0 = &i2c_eeprom;
+	};
+	pulse_pin: pulse_pin {			
+		compatible = "pulse-pin";
+		gpios = <&gpioc 7 GPIO_ACTIVE_HIGH>;
 	};	
 };
 

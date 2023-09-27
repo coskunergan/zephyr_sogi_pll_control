@@ -16,6 +16,7 @@
 #include <zephyr/drivers/adc.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/drivers/eeprom.h>
+#include <zephyr/drivers/dac.h>
 
 #include <zpp.hpp>
 #include <chrono>
@@ -25,6 +26,7 @@
 #include "encoder.h"
 #include "adc_io.h"
 #include "mc_spll.h"
+#include "arm_math.h"
 
 #define EEPROM_SETVAL_OFFSET 0
 
@@ -41,9 +43,8 @@ using namespace control;
 
 #define NUM_THREADS 5
 
-#define SET_DEGREE 150
-#define DIFF_DEGREE 10
-#define OFFSET_PHASE 90
+#define SET_DEGREE 180
+#define OFFSET_PHASE 0
 
 ADC adc;
 
@@ -64,6 +65,35 @@ const struct gpio_dt_spec supply_pin = GPIO_DT_SPEC_GET_OR(DT_NODELABEL(i2c_eepr
                                        {
                                            0
                                        });
+
+static const struct gpio_dt_spec pulse_pin =
+    GPIO_DT_SPEC_GET_OR(DT_NODELABEL(pulse_pin), gpios,
+                        {
+                            0
+                        });
+
+
+#define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
+
+#if (DT_NODE_HAS_PROP(ZEPHYR_USER_NODE, dac) && \
+	DT_NODE_HAS_PROP(ZEPHYR_USER_NODE, dac_channel_id) && \
+	DT_NODE_HAS_PROP(ZEPHYR_USER_NODE, dac_resolution))
+#define DAC_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac)
+#define DAC_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac_channel_id)
+#define DAC_RESOLUTION DT_PROP(ZEPHYR_USER_NODE, dac_resolution)
+#else
+
+#endif
+
+static const struct device *const dac_dev = DEVICE_DT_GET(DAC_NODE);
+
+static const struct dac_channel_cfg dac_ch_cfg =
+{
+    .channel_id  = DAC_CHANNEL_ID,
+    .resolution  = DAC_RESOLUTION,
+    .buffered = true
+};
+
 
 namespace
 {
@@ -131,29 +161,38 @@ void sensor_task(int my_id) noexcept
 void adc_task(int my_id) noexcept
 {
     int degree;
+    if(!device_is_ready(dac_dev))
+    {
+        printk("DAC device %s is not ready\n", dac_dev->name);
+        return;
+    }
+    int ret = dac_channel_setup(dac_dev, &dac_ch_cfg);
+    if(ret != 0)
+    {
+        printk("Setting up of DAC channel failed with code %d\n", ret);
+        return;
+    }
+    gpio_pin_configure_dt(&pulse_pin, GPIO_OUTPUT_INACTIVE);
     Phase.reset();
-    adc.readAsync(1ms, [&](size_t idx, int16_t val)
+    this_thread::sleep_for(500ms);
+    adc.readAsync(500us, [&](size_t idx, int16_t val)
     {
         switch((adc_t)idx)
         {
             case ac_input:
-                //printf("\rADC: %d   ", val);
-                //buzzer.beep(10ms);
-                //GPIO_SetBits(GPIOB, GPIO_Pin_3);
-                Phase.transfer_1phase((float)val); // ~145 uSn
-                degree = ((Phase.phase() / 3.14159265358979323f) * 180.0f);
+                Phase.transfer_1phase((float)val); // ~181uS CM3 32MHz
+                degree = ((Phase.phase() / PI) * 180.0f);
                 degree += OFFSET_PHASE;
                 degree %= 360;
-                if((degree > SET_DEGREE && degree < (DIFF_DEGREE + SET_DEGREE)) ||
-                        (degree > (SET_DEGREE + 180) && degree < (DIFF_DEGREE + SET_DEGREE + 180)))
+                dac_write_value(dac_dev, DAC_CHANNEL_ID, degree * 11);
+                if(degree > SET_DEGREE)
                 {
-                    //GPIO_SetBits(GPIOC, GPIO_Pin_7);
+                    gpio_pin_set_dt(&pulse_pin, true);
                 }
-                else
+                if(degree > 340 || degree < SET_DEGREE)
                 {
-                    //GPIO_ResetBits(GPIOC, GPIO_Pin_7);
+                    gpio_pin_set_dt(&pulse_pin, false);
                 }
-                //GPIO_ResetBits(GPIOB, GPIO_Pin_3);
                 break;
             default:
                 break;
@@ -223,10 +262,10 @@ void display_task(int my_id) noexcept
     for(;;)
     {
         this_thread::sleep_for(100ms);
-        freq_sum -= freq_sum / 10;
+        freq_sum -= freq_sum / 20;
         freq_sum += Phase.freq() * Phase.freq();
         freq = (freq == 0) ? 1 : freq;
-        freq = (freq + ((freq_sum / 10) / freq)) / 2;
+        freq = (freq + ((freq_sum / 20) / freq)) / 2;
         printf("\rISI: 37.7 %%99");
         if(set_mode_enable)
         {

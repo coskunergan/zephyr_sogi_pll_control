@@ -47,7 +47,11 @@
 	};	
 	aliases {		
 		eeprom-0 = &i2c_eeprom;
-	};				
+	};	
+	pulse_pin: pulse_pin {			
+		compatible = "pulse-pin";
+		gpios = <&gpioc 7 GPIO_ACTIVE_HIGH>;
+	};					
 };
 
 &usart3 {
