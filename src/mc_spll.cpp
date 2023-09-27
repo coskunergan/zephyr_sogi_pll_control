@@ -41,9 +41,9 @@ void SPLL::reset()
 }
 
 void SPLL::transfer_1phase(value_t val) // ~145 uSn 32MHz CM3
-{
+{    
     value_t v_org = auto_offset(val);
-
+    
     if (sample_index < N_SAMPLE)
     {
         sample_index += 1;

@@ -42,9 +42,7 @@ using namespace device_adc;
 using namespace control;
 
 #define NUM_THREADS 5
-
-#define SET_DEGREE 180
-#define OFFSET_PHASE 0
+#define OFFSET_PHASE 90
 
 ADC adc;
 
@@ -60,6 +58,7 @@ mutex btn_mutex;
 
 bool set_mode_enable = false;
 float set_value;
+uint8_t set_degree;
 
 const struct gpio_dt_spec supply_pin = GPIO_DT_SPEC_GET_OR(DT_NODELABEL(i2c_eeprom), supply_gpios,
                                        {
@@ -175,21 +174,21 @@ void adc_task(int my_id) noexcept
     gpio_pin_configure_dt(&pulse_pin, GPIO_OUTPUT_INACTIVE);
     Phase.reset();
     this_thread::sleep_for(500ms);
-    adc.readAsync(500us, [&](size_t idx, int16_t val)
+    adc.readAsyncISR(250us, [&](size_t idx, int16_t val)
     {
         switch((adc_t)idx)
         {
             case ac_input:
-                Phase.transfer_1phase((float)val); // ~181uS CM3 32MHz
+                Phase.transfer_1phase(val); // ~181uS CM3 32MHz
                 degree = ((Phase.phase() / PI) * 180.0f);
                 degree += OFFSET_PHASE;
-                degree %= 360;
+                degree %= 180;
                 dac_write_value(dac_dev, DAC_CHANNEL_ID, degree * 11);
-                if(degree > SET_DEGREE)
+                if(degree > set_degree)
                 {
                     gpio_pin_set_dt(&pulse_pin, true);
                 }
-                if(degree > 340 || degree < SET_DEGREE)
+                else if(degree > 165 || degree < set_degree)
                 {
                     gpio_pin_set_dt(&pulse_pin, false);
                 }
@@ -285,12 +284,9 @@ void display_task(int my_id) noexcept
             eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
             temp_set_value = set_value;
         }
+        set_degree = 160 - ((set_value * 10) - 180);// test
     }
 }
-
-// sprintf(row, "T:%.2f%cC",
-//         sensor_value_to_double(&temp),
-//         223 /* degree symbol */);
 
 int main(void)
 {
