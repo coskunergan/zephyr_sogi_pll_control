@@ -24,17 +24,17 @@ namespace control
         SPLL();
         ~SPLL() = default;
 
-        SPLL(SPLL&&) = delete;
-        SPLL& operator=(SPLL&&) = delete;
+        SPLL(SPLL &&) = delete;
+        SPLL &operator=(SPLL &&) = delete;
 
         SPLL(const SPLL &) = delete;
-        SPLL& operator=(const SPLL &) = delete;
+        SPLL &operator=(const SPLL &) = delete;
 
         void reset();
 
         void transfer_1phase(value_t val);
 
-        bool is_lock(value_t th = 1e-2f) const;
+        bool is_lock(value_t th = 38e-3f) const;
 
         inline value_t freq() const noexcept
         {
@@ -58,15 +58,15 @@ namespace control
         value_t cur_phase;
 
         value_t auto_offset_min;
-		
+
         value_t auto_offset_max;
 
         value_t sogi_s1;
-		
+
         value_t sogi_s2;
 
         value_t last_error;
-    
+
         value_t auto_offset(value_t inp);
     };
 }

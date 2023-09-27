@@ -9,7 +9,7 @@
 #include "mc_spll.h"
 
 extern "C" {
-     #include "arm_math.h"
+#include "arm_math.h"
 }
 
 using namespace control;
@@ -40,17 +40,18 @@ void SPLL::reset()
     pid.reset();
 }
 
-void SPLL::transfer_1phase(value_t val) // ~145 uSn 32MHz CM3
-{    
+void SPLL::transfer_1phase(value_t val) // ~145 uSn 32MHz
+{
     value_t v_org = auto_offset(val);
-    
-    if (sample_index < N_SAMPLE)
+
+    if(sample_index < N_SAMPLE)
     {
         sample_index += 1;
         launch_loop = false;
         return;
     }
-    else {
+    else
+    {
         launch_loop = true;
     }
     value_t v = v_org / (auto_offset_max - auto_offset_min);
@@ -81,11 +82,11 @@ void SPLL::transfer_1phase(value_t val) // ~145 uSn 32MHz CM3
 
     value_t i = cur_phase;
     i += Ti * u;
-    if (i > constant_value<value_t>::TAU)
+    if(i > constant_value<value_t>::TAU)
     {
         i -= constant_value<value_t>::TAU;
     }
-    else if (i < -constant_value<value_t>::TAU)
+    else if(i < -constant_value<value_t>::TAU)
     {
         i += constant_value<value_t>::TAU;
     }
@@ -102,11 +103,13 @@ bool SPLL::is_lock(value_t th) const
 
 value_t SPLL::auto_offset(value_t inp)
 {
-    if (inp > auto_offset_max)
+    auto_offset_max -= constant_value<value_t>::MAX / 1e+4f;
+    auto_offset_min += constant_value<value_t>::MAX / 1e+4f;
+    if(inp > auto_offset_max)
     {
         auto_offset_max = inp;
     }
-    else if (inp < auto_offset_min)
+    else if(inp < auto_offset_min)
     {
         auto_offset_min = inp;
     }

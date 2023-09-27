@@ -43,7 +43,7 @@ using namespace control;
 
 #define NUM_THREADS 5
 #define OFFSET_PHASE 90
-
+#define PULSE_OFF_DEGREE 170
 ADC adc;
 
 SPLL Phase;
@@ -59,6 +59,7 @@ mutex btn_mutex;
 bool set_mode_enable = false;
 float set_value;
 uint8_t set_degree;
+int menu_timeout;
 
 const struct gpio_dt_spec supply_pin = GPIO_DT_SPEC_GET_OR(DT_NODELABEL(i2c_eeprom), supply_gpios,
                                        {
@@ -188,7 +189,7 @@ void adc_task(int my_id) noexcept
                 {
                     gpio_pin_set_dt(&pulse_pin, true);
                 }
-                else if(degree > 165 || degree < set_degree)
+                else if(degree > PULSE_OFF_DEGREE || degree < set_degree)
                 {
                     gpio_pin_set_dt(&pulse_pin, false);
                 }
@@ -198,11 +199,11 @@ void adc_task(int my_id) noexcept
         }
     });
 
+    PID temp_pid;
     for(;;)
     {
-        this_thread::sleep_for(5000ms);
-        //buzzer.beep(3ms);
-        //printf("\rV = %"PRId32" mV\n", adc.get_voltage(0));
+        this_thread::sleep_for(500ms);
+        volatile value_t u = temp_pid.pi_transfer(1e-5f);
     }
 }
 
@@ -218,6 +219,7 @@ void btn_task(int my_id) noexcept // ok
         buzzer.beep(20ms);
         printf_io.turn_off_bl_enable();
         set_mode_enable = !set_mode_enable;
+        menu_timeout = 50; // ~5sn
     }
 }
 
@@ -230,6 +232,7 @@ void enc_task(int my_id) noexcept // ok
         encoder.event_cv().wait(lk);
         buzzer.beep(5ms);
         printf_io.turn_off_bl_enable();
+        menu_timeout = 50; // ~5sn
     }
 }
 
@@ -261,10 +264,10 @@ void display_task(int my_id) noexcept
     for(;;)
     {
         this_thread::sleep_for(100ms);
-        freq_sum -= freq_sum / 20;
+        freq_sum -= freq_sum / 10;
         freq_sum += Phase.freq() * Phase.freq();
         freq = (freq == 0) ? 1 : freq;
-        freq = (freq + ((freq_sum / 20) / freq)) / 2;
+        freq = (freq + ((freq_sum / 10) / freq)) / 2;
         printf("\rISI: 37.7 %%99");
         if(set_mode_enable)
         {
@@ -284,7 +287,15 @@ void display_task(int my_id) noexcept
             eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
             temp_set_value = set_value;
         }
-        set_degree = 160 - ((set_value * 10) - 180);// test
+        set_degree = PULSE_OFF_DEGREE - ((set_value * 10) - 180);// test
+        if(menu_timeout)
+        {
+            if(--menu_timeout == 0)
+            {
+                set_mode_enable = false;
+            }
+
+        }
     }
 }
 
