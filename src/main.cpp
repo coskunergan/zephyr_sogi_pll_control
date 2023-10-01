@@ -58,6 +58,7 @@ mutex btn_mutex;
 
 bool set_mode_enable = false;
 float set_value;
+float measure_value;
 uint8_t set_degree;
 int menu_timeout;
 
@@ -151,10 +152,19 @@ void sensor_task(int my_id) noexcept
     }
     for(;;)
     {
-        sensor_sample_fetch(dev);
-        sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
-        //printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
-        this_thread::sleep_for(3000ms);
+        int rc = sensor_sample_fetch(dev);
+        if(rc == 0)
+        {
+            sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
+            //printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
+            temp.val1 = (temp.val1 < 10) ? 10 : (temp.val1 > 45) ? 45 : temp.val1;
+            measure_value = sensor_value_to_double(&temp);
+        }
+        else
+        {
+            measure_value = 88.8;
+        }
+        this_thread::sleep_for(2000ms);
     }
 }
 
@@ -199,11 +209,19 @@ void adc_task(int my_id) noexcept
         }
     });
 
-    PID temp_pid;
+    PID pid;
+    pid.param.kp = 750;
+    pid.param.ki = 15;
+    pid.param.kd = 0;
+    pid.param.kc = 10;
+    pid.param.i_min = 0;
+    pid.param.i_max = PULSE_OFF_DEGREE;
+    pid.reset();
+
     for(;;)
     {
-        this_thread::sleep_for(500ms);
-        volatile value_t u = temp_pid.pi_transfer(1e-5f);
+        this_thread::sleep_for(2000ms); //sensor task içinden -->> semaphore signal eklenecek..
+        set_degree = pid.pi_transfer(measure_value);
     }
 }
 
@@ -268,7 +286,7 @@ void display_task(int my_id) noexcept
         freq_sum += Phase.freq() * Phase.freq();
         freq = (freq == 0) ? 1 : freq;
         freq = (freq + ((freq_sum / 10) / freq)) / 2;
-        printf("\rISI: 37.7 %%99");
+        printf("\rISI: %.1f %%%02d", measure_value, ((set_degree * 100) / PULSE_OFF_DEGREE));
         if(set_mode_enable)
         {
             set_value = (float)encoder.get_count()  / 10;
@@ -287,14 +305,13 @@ void display_task(int my_id) noexcept
             eeprom_write(eeprom, EEPROM_SETVAL_OFFSET, &set_value, sizeof(set_value));
             temp_set_value = set_value;
         }
-        set_degree = PULSE_OFF_DEGREE - ((set_value * 10) - 180);// test
+        //set_degree = PULSE_OFF_DEGREE - ((set_value * 10) - 180);// test
         if(menu_timeout)
         {
             if(--menu_timeout == 0)
             {
                 set_mode_enable = false;
             }
-
         }
     }
 }
@@ -303,7 +320,7 @@ int main(void)
 {
     printf_io.turn_off_bl_enable();
     printf("\rRestart..");
-    //buzzer.beep();
+    buzzer.beep();
 
     const thread_attr attrs(
         thread_prio::preempt(10),
