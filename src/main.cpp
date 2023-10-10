@@ -220,8 +220,8 @@ void adc_task(int my_id) noexcept
 
     for(;;)
     {
-        this_thread::sleep_for(2000ms); //sensor task içinden -->> semaphore signal eklenecek..
-        set_degree = pid.pi_transfer(measure_value);
+        this_thread::sleep_for(1000ms); //sensor task içinden -->> semaphore signal eklenecek..
+        set_degree = pid.pi_transfer(measure_value - set_value);
     }
 }
 
