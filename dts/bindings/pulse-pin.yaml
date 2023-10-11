@@ -1,0 +1,11 @@
+
+description: GPIO pin to switch a pulse
+
+compatible: "pulse-pin"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: |
+      The GPIO connected to the pulse

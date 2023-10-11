@@ -292,12 +292,12 @@ void display_task(int my_id) noexcept
             set_value = (float)encoder.get_count()  / 10;
             set_value = (set_value < 18.0) ? 18.0 : set_value;
             set_value = (set_value > 45.0) ? 45.0 : set_value;
-            sprintf(buffer, "\nSET:>%.1f<%c%02d ", set_value, (Phase.is_lock()) ? 'L' : 'x', freq);
+            sprintf(buffer, "\nSET:>%.1f<%c%02d ", set_value, (Phase.is_lock()) ? 'L' : 'x', (uint8_t)(freq - 10));
         }
         else
         {
             encoder.set_count(set_value * 10);
-            sprintf(buffer, "\nSET: %.1f %c%02d ", set_value, (Phase.is_lock()) ? 'L' : 'x', freq);
+            sprintf(buffer, "\nSET: %.1f %c%02d ", set_value, (Phase.is_lock()) ? 'L' : 'x', (uint8_t)(freq - 10));
         }
         printf(buffer);
         if(temp_set_value != set_value)
@@ -319,7 +319,9 @@ void display_task(int my_id) noexcept
 int main(void)
 {
     printf_io.turn_off_bl_enable();
-    printf("\rRestart..");
+    printf("\rCoskun ERGAN  ");
+    printf("\nVersion : 1.0 ");
+    this_thread::sleep_for(1000ms);
     buzzer.beep();
 
     const thread_attr attrs(
