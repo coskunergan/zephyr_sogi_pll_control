@@ -210,17 +210,17 @@ void adc_task(int my_id) noexcept
     });
 
     PID pid;
-    pid.param.kp = 750;
-    pid.param.ki = 15;
+    pid.param.kp = 7.5;
+    pid.param.ki = 0.15;
     pid.param.kd = 0;
-    pid.param.kc = 10;
+    pid.param.kc = 0.10;
     pid.param.i_min = 0;
     pid.param.i_max = PULSE_OFF_DEGREE;
     pid.reset();
 
     for(;;)
     {
-        this_thread::sleep_for(1000ms); //sensor task içinden -->> semaphore signal eklenecek..
+        this_thread::sleep_for(500ms);
         set_degree = pid.pi_transfer(measure_value - set_value);
     }
 }
@@ -286,7 +286,7 @@ void display_task(int my_id) noexcept
         freq_sum += Phase.freq() * Phase.freq();
         freq = (freq == 0) ? 1 : freq;
         freq = (freq + ((freq_sum / 10) / freq)) / 2;
-        printf("\rISI: %.1f %%%02d", measure_value, ((set_degree * 100) / PULSE_OFF_DEGREE));
+        printf("\rISI: %.1f %%%02d", measure_value, 99 - ((set_degree * 100) / (PULSE_OFF_DEGREE + 1)));
         if(set_mode_enable)
         {
             set_value = (float)encoder.get_count()  / 10;
