@@ -47,6 +47,7 @@
 	};	
 	aliases {		
 		eeprom-0 = &i2c_eeprom;
+		watchdog0 = &iwdg;
 	};	
 	pulse_pin: pulse_pin {			
 		compatible = "pulse-pin";
@@ -94,5 +95,11 @@
 	};
 };
 
+&iwdg {
+	status = "okay";
+};
 
+&wwdg {
+	status = "disabled";
+};
 

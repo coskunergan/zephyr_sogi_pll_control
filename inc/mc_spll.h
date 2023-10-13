@@ -34,7 +34,7 @@ namespace control
 
         void transfer_1phase(value_t val);
 
-        bool is_lock(value_t th = 40e-3f) const;
+        bool is_lock(value_t th = 50e-3f) const;
 
         inline value_t freq() const noexcept
         {

@@ -17,6 +17,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/drivers/eeprom.h>
 #include <zephyr/drivers/dac.h>
+#include <zephyr/drivers/watchdog.h>
 
 #include <zpp.hpp>
 #include <chrono>
@@ -59,8 +60,15 @@ mutex btn_mutex;
 bool set_mode_enable = false;
 float set_value;
 float measure_value;
-uint8_t set_degree;
+uint8_t set_degree = PULSE_OFF_DEGREE;
 int menu_timeout;
+int wdt_channel_id;
+const struct device *const wdt = DEVICE_DT_GET(DT_ALIAS(watchdog0));
+int iwdt_count = 0;
+#define IWDT_ADC_NUMBER     1
+#define IWDT_SENSOR_NUMBER  2
+#define IWDT_DISPLAY_NUMBER 4
+#define IWDT_CHECK_NUMBER ( IWDT_ADC_NUMBER + IWDT_SENSOR_NUMBER + IWDT_DISPLAY_NUMBER )
 
 const struct gpio_dt_spec supply_pin = GPIO_DT_SPEC_GET_OR(DT_NODELABEL(i2c_eeprom), supply_gpios,
                                        {
@@ -151,26 +159,33 @@ void sensor_task(int my_id) noexcept
         return;
     }
     for(;;)
-    {
+    {        
         int rc = sensor_sample_fetch(dev);
         if(rc == 0)
-        {
+        {            
             sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
             //printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
             temp.val1 = (temp.val1 < 10) ? 10 : (temp.val1 > 45) ? 45 : temp.val1;
             measure_value = sensor_value_to_double(&temp);
+            iwdt_count |= IWDT_SENSOR_NUMBER;
         }
         else
         {
             measure_value = 88.8;
         }
         this_thread::sleep_for(2000ms);
+        if(iwdt_count == IWDT_CHECK_NUMBER)
+        {
+            wdt_feed(wdt, wdt_channel_id);
+        }
+        iwdt_count = 0;
     }
 }
 
 void adc_task(int my_id) noexcept
 {
     int degree;
+    wdt_feed(wdt, wdt_channel_id);
     if(!device_is_ready(dac_dev))
     {
         printk("DAC device %s is not ready\n", dac_dev->name);
@@ -195,7 +210,11 @@ void adc_task(int my_id) noexcept
                 degree += OFFSET_PHASE;
                 degree %= 180;
                 dac_write_value(dac_dev, DAC_CHANNEL_ID, degree * 11);
-                if(degree > set_degree)
+                if(!Phase.is_lock())
+                {
+                    gpio_pin_set_dt(&pulse_pin, false);
+                }
+                else if(degree > set_degree)
                 {
                     gpio_pin_set_dt(&pulse_pin, true);
                 }
@@ -203,6 +222,7 @@ void adc_task(int my_id) noexcept
                 {
                     gpio_pin_set_dt(&pulse_pin, false);
                 }
+                iwdt_count |= IWDT_ADC_NUMBER;
                 break;
             default:
                 break;
@@ -217,9 +237,10 @@ void adc_task(int my_id) noexcept
     pid.param.i_min = 0;
     pid.param.i_max = PULSE_OFF_DEGREE;
     pid.reset();
+    pid.pi_transfer(-1e+3);
 
     for(;;)
-    {
+    {        
         this_thread::sleep_for(500ms);
         set_degree = pid.pi_transfer(measure_value - set_value);
     }
@@ -313,16 +334,50 @@ void display_task(int my_id) noexcept
                 set_mode_enable = false;
             }
         }
+        iwdt_count |= IWDT_DISPLAY_NUMBER;
     }
 }
 
 int main(void)
 {
+    int err;
+    if(!device_is_ready(wdt))
+    {
+        printk("%s: device not ready.\n", wdt->name);
+        return 0;
+    }
+
+    struct wdt_timeout_cfg wdt_config;
+    wdt_config.flags = WDT_FLAG_RESET_SOC;
+    wdt_config.window.min = 0U;
+    wdt_config.window.max = 8000U;
+
+    wdt_channel_id = wdt_install_timeout(wdt, &wdt_config);
+    if(wdt_channel_id == -ENOTSUP)
+    {
+        /* IWDG driver for STM32 doesn't support callback */
+        printk("Callback support rejected, continuing anyway\n");
+        wdt_config.callback = NULL;
+        wdt_channel_id = wdt_install_timeout(wdt, &wdt_config);
+    }
+    if(wdt_channel_id < 0)
+    {
+        printk("Watchdog install error\n");
+        return 0;
+    }
+
+    err = wdt_setup(wdt, WDT_OPT_PAUSE_HALTED_BY_DBG);
+    if(err < 0)
+    {
+        printk("Watchdog setup error\n");
+        return 0;
+    }
+
     printf_io.turn_off_bl_enable();
     printf("\rCoskun ERGAN  ");
     printf("\nVersion : 1.0 ");
     this_thread::sleep_for(1000ms);
-    buzzer.beep();
+    buzzer.beep(10ms);
 
     const thread_attr attrs(
         thread_prio::preempt(10),
