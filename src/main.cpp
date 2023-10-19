@@ -150,8 +150,72 @@ static const struct device *get_ds18b20_device(void)
     return dev;
 }
 
+float run_min_max_filter(float val)
+{
+    static float measure_value_arr[5] = {-99, 99, -99, 99, -99};
+    static uint8_t index = 0;
+    uint8_t min_index;
+    uint8_t max_index;
+    uint8_t catch_index = 0x1F;
+    uint8_t i, j;
+    float temp_min;
+    float temp_max;
+    measure_value_arr[index] = val;
+    index++;
+    index %= 5;
+    for(j = 0; j < 2; j++)
+    {
+        //------- find min -------
+        for(i = 0; i < 5; i++)
+        {
+            if(catch_index & (1U << i))
+            {
+                break;
+            }
+        }
+        temp_min = measure_value_arr[i];
+        for(i = 0; i < 5; i++)
+        {
+            if((catch_index & (1U << i)) && (measure_value_arr[i] < temp_min))
+            {
+                temp_min = measure_value_arr[i];
+                min_index = i;
+            }
+        }
+        catch_index &= ~(1U << min_index);
+        //------- find max -------
+        for(i = 0; i < 5; i++)
+        {
+            if(catch_index & (1U << i))
+            {
+                break;
+            }
+        }
+        temp_max = measure_value_arr[i];
+        for(i = 0; i < 5; i++)
+        {
+            if((catch_index & (1U << i)) && (measure_value_arr[i] > temp_max))
+            {
+                temp_max = measure_value_arr[i];
+                max_index = i;
+            }
+        }
+        catch_index &= ~(1U << max_index);
+    }
+    for(i = 0; i < 5; i++)
+    {
+        catch_index >>= 1U;
+        if(catch_index == 0)
+        {
+            break;
+        }
+    }
+    return measure_value_arr[i];
+}
+
 void sensor_task(int my_id) noexcept
 {
+    float measure;
     struct sensor_value temp;
     const struct device *dev = get_ds18b20_device();
     if(dev == NULL)
@@ -159,20 +223,21 @@ void sensor_task(int my_id) noexcept
         return;
     }
     for(;;)
-    {        
+    {
         int rc = sensor_sample_fetch(dev);
         if(rc == 0)
-        {            
+        {
             sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
             //printf("\rTemp: %d.%06d   ", temp.val1, temp.val2);
             temp.val1 = (temp.val1 < 10) ? 10 : (temp.val1 > 45) ? 45 : temp.val1;
-            measure_value = sensor_value_to_double(&temp);
+            measure = sensor_value_to_double(&temp);
             iwdt_count |= IWDT_SENSOR_NUMBER;
         }
         else
         {
-            measure_value = 88.8;
+            measure = 88.8;
         }
+        measure_value = run_min_max_filter(measure);
         this_thread::sleep_for(2000ms);
         if(iwdt_count == IWDT_CHECK_NUMBER)
         {
@@ -240,7 +305,7 @@ void adc_task(int my_id) noexcept
     pid.pi_transfer(-1e+3);
 
     for(;;)
-    {        
+    {
         this_thread::sleep_for(500ms);
         set_degree = pid.pi_transfer(measure_value - set_value);
     }
@@ -375,7 +440,7 @@ int main(void)
 
     printf_io.turn_off_bl_enable();
     printf("\rCoskun ERGAN  ");
-    printf("\nVersion : 1.0 ");
+    printf("\nVersion : 1.1 ");
     this_thread::sleep_for(1000ms);
     buzzer.beep(10ms);
 
