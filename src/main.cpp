@@ -440,7 +440,7 @@ int main(void)
 
     printf_io.turn_off_bl_enable();
     printf("\rCoskun ERGAN  ");
-    printf("\nVersion : 1.1 ");
+    printf("\nVersion : 1.2 ");
     this_thread::sleep_for(1000ms);
     buzzer.beep(10ms);
 
