@@ -5,8 +5,8 @@
    "AppUnderDev": "${workspaceRoot}"
    },
 "bsp": {
-   "board": "stm32l1_disco",
-   //"board": "stm32f4_disco",
+   //"board": "stm32l1_disco",
+   "board": "stm32f4_disco",
  },
 "app": {
    "name": "${config:workspaceFolder.AppUnderDev}",
